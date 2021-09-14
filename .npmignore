@@ -1,0 +1,14 @@
+bin/
+lib/
+test/
+.vscode/
+.eslintignore
+.npmignore
+azure-pipelines.yml
+tsconfig.json
+tsconfig.eslint.json
+.eslintrc.js
+babel.config.js
+jest.config.js
+workaround-types/**
+

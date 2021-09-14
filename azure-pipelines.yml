@@ -1,0 +1,65 @@
+trigger:
+- master
+variables:
+- name: Artifact.Name
+  value: drop
+stages:
+- stage: Create
+  displayName: Create package for all bindings
+  jobs:  
+  - job: Build
+    pool: 
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: npmAuthenticate@0
+      inputs:
+        workingFile: '.npmrc'
+    - script: |
+        npm install -g npm@latest
+        npm install
+      displayName: 'npm install'
+    - script: |
+        npm run lint
+      displayName: 'run lint'        
+    - script: |
+        npm install -g npm@latest
+        npm install
+        npm run build
+      displayName: 'create artifacts'
+    - script: |
+        npm run test
+      displayName: 'run jest tests'
+    - script: |
+        JSON_VERSION=`jq .version package.json | sed -e 's/^"//' -e 's/"$//'`
+        PACKAGE_NAME=`jq .name package.json | sed -e 's/^"//' -e 's/"$//'`
+        VERSION_REGEX="\d*\.\d*\.0"
+        if echo $JSON_VERSION | grep -P -q $VERSION_REGEX ; then
+          echo "Patch version in package.json file is 0. Continue"
+        else
+          echo "Patch version in package.json file is not 0. Abort"
+          exit 1
+        fi
+        # Compares npm and package.json versions
+        CURR_VERSION=`npm show $PACKAGE_NAME version`
+        echo "Current version is $CURR_VERSION"
+        if [ "$CURR_VERSION" = "$JSON_VERSION" ]
+        then
+          echo "Patching package.json version"
+          npm version --no-git-tag-version patch
+        elif [ "$JSON_VERSION" = "`echo -e "$JSON_VERSION\n$CURR_VERSION" | sort -V | tail -n1`" ]
+        then
+          echo "package.json version is higher than current npm version."
+        else
+          echo "package.json version is lower than current npm. Replacing and patching"
+          tmp=package.json.tmp
+          jq --arg v "$CURR_VERSION" '.version = $v' package.json > "$tmp" && mv "$tmp" package.json
+          npm version --no-git-tag-version patch
+        fi
+      displayName: 'patch version if already exists'
+    - task: Npm@1
+      displayName: 'Publish npm package'
+      inputs:
+        command: 'publish'
+        workingDir: '.'
+        publishRegistry: 'useFeed'
+        publishFeed: 'ea878894-5794-4f5d-9389-fc8b3b4716a2'
