@@ -36,6 +36,7 @@ export class ImportAccountsCommand {
           page.roleList && account.roles.push(...page.roleList);
         }
         process.stdout.write(".");
+        await new Promise(f => setTimeout(f, 100));
       }
       console.log("");
 
